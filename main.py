@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+import os
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
@@ -211,6 +212,61 @@ def get_books_by_author(author_id):
     books = Book.query.filter_by(author_id=author_id).all()
     result = [book_to_dict(b) for b in books]
     return jsonify(result), 200
+
+
+@app.route("/books", methods=["POST"])
+def create_book():
+    data = request.get_json()
+
+    title = data.get("title")
+    author_id = data.get("author_id")
+
+    if not title or not author_id:
+        return jsonify({"error": "title and author_id are required"}), 400
+
+    author = Author.query.get(author_id)
+    if not author:
+        return jsonify({"error": "author not found"}), 404
+
+    book = Book(title=title, author_id=author_id)
+    db.session.add(book)
+    db.session.commit()
+
+    return jsonify(book_to_dict(book)), 201
+
+
+@app.route("/books", methods=["GET"])
+def get_all_books():
+    author_id = request.args.get("author_id", type=int)
+
+    if author_id is not None:
+        books = Book.query.filter_by(author_id=author_id).all()
+    else:
+        books = Book.query.all()
+
+    result = [book_to_dict(b) for b in books]
+    return jsonify(result), 200
+
+
+@app.route("/books/<int:book_id>", methods=["GET"])
+def get_book_by_id(book_id):
+    book = Book.query.get(book_id)
+    if not book:
+        return jsonify({"error": "book not found"}), 404
+
+    return jsonify(book_to_dict(book)), 200
+
+
+@app.route("/books/<int:book_id>", methods=["DELETE"])
+def delete_book(book_id):
+    book = Book.query.get(book_id)
+    if not book:
+        return jsonify({"error": "book not found"}), 404
+
+    db.session.delete(book)
+    db.session.commit()
+
+    return jsonify({"message": f"book {book_id} deleted"}), 200
 
 
 if __name__ == "__main__":
