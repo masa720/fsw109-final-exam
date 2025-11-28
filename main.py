@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-import os
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
@@ -66,12 +65,29 @@ class Borrow(db.Model):
 
     borrow_date = db.Column(db.DateTime, default=datetime.utcnow)
 
-def user_to_dict(user: "User"):
+
+def user_to_dict(user: User):
     return {
         "id": user.id,
         "name": user.name,
         "email": user.email,
     }
+
+
+def author_to_dict(author: Author):
+    return {
+        "id": author.id,
+        "name": author.name,
+    }
+
+
+def book_to_dict(book: Book):
+    return {
+        "id": book.id,
+        "title": book.title,
+        "author_id": book.author_id,
+    }
+
 
 
 @app.route("/")
@@ -153,9 +169,51 @@ def delete_user(user_id):
     return jsonify({"message": f"user {user_id} deleted"}), 200
 
 
+# Author CRUD
+
+@app.route("/authors", methods=["POST"])
+def create_author():
+    data = request.get_json()
+
+    name = data.get("name")
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+
+    author = Author(name=name)
+    db.session.add(author)
+    db.session.commit()
+
+    return jsonify(author_to_dict(author)), 201
+
+
+@app.route("/authors", methods=["GET"])
+def get_all_authors():
+    authors = Author.query.all()
+    result = [author_to_dict(a) for a in authors]
+    return jsonify(result), 200
+
+
+@app.route("/authors/<int:author_id>", methods=["GET"])
+def get_author_by_id(author_id):
+    author = Author.query.get(author_id)
+    if not author:
+        return jsonify({"error": "author not found"}), 404
+
+    return jsonify(author_to_dict(author)), 200
+
+
+@app.route("/authors/<int:author_id>/books", methods=["GET"])
+def get_books_by_author(author_id):
+    author = Author.query.get(author_id)
+    if not author:
+        return jsonify({"error": "author not found"}), 404
+
+    books = Book.query.filter_by(author_id=author_id).all()
+    result = [book_to_dict(b) for b in books]
+    return jsonify(result), 200
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=True, port=port)
+    app.run(debug=True)
