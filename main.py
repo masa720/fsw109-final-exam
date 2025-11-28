@@ -1,4 +1,5 @@
-from flask import Flask
+from flask import Flask, request, jsonify
+import os
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
@@ -65,14 +66,96 @@ class Borrow(db.Model):
 
     borrow_date = db.Column(db.DateTime, default=datetime.utcnow)
 
+def user_to_dict(user: "User"):
+    return {
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+    }
+
 
 @app.route("/")
 def index():
     return "Hello!"
 
 
+@app.route("/users", methods=["POST"])
+def create_user():
+    data = request.get_json()
+
+    name = data.get("name")
+    email = data.get("email")
+
+    if not name or not email:
+        return jsonify({"error": "name and email are required"}), 400
+
+    existing = User.query.filter_by(email=email).first()
+    if existing:
+        return jsonify({"error": "email already exists"}), 400
+
+    user = User(name=name, email=email)
+    db.session.add(user)
+    db.session.commit()
+
+    return jsonify(user_to_dict(user)), 201
+
+
+@app.route("/users", methods=["GET"])
+def get_all_users():
+    users = User.query.all()
+    result = [user_to_dict(u) for u in users]
+    return jsonify(result), 200
+
+
+@app.route("/users/<int:user_id>", methods=["GET"])
+def get_user_by_id(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "user not found"}), 404
+
+    return jsonify(user_to_dict(user)), 200
+
+
+@app.route("/users/<int:user_id>", methods=["PUT"])
+def update_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "user not found"}), 404
+
+    data = request.get_json()
+
+    name = data.get("name")
+    email = data.get("email")
+
+    if name:
+        user.name = name
+
+    if email:
+        existing = User.query.filter_by(email=email).first()
+        if existing and existing.id != user.id:
+            return jsonify({"error": "email already in use by another user"}), 400
+        user.email = email
+
+    db.session.commit()
+
+    return jsonify(user_to_dict(user)), 200
+
+
+@app.route("/users/<int:user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "user not found"}), 404
+
+    db.session.delete(user)
+    db.session.commit()
+
+    return jsonify({"message": f"user {user_id} deleted"}), 200
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
 
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, port=port)
