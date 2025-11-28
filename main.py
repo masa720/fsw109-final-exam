@@ -269,6 +269,69 @@ def delete_book(book_id):
     return jsonify({"message": f"book {book_id} deleted"}), 200
 
 
+@app.route("/borrows", methods=["POST"])
+def create_borrow():
+    data = request.get_json()
+
+    user_id = data.get("user_id")
+    book_id = data.get("book_id")
+
+    if not user_id or not book_id:
+        return jsonify({"error": "user_id and book_id are required"}), 400
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "user not found"}), 404
+
+    book = Book.query.get(book_id)
+    if not book:
+        return jsonify({"error": "book not found"}), 404
+
+    borrow = Borrow(user_id=user_id, book_id=book_id)
+    db.session.add(borrow)
+    db.session.commit()
+
+    return jsonify(borrow_to_dict(borrow)), 201
+
+
+@app.route("/users/<int:user_id>/borrows", methods=["GET"])
+def get_borrowed_books_for_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "user not found"}), 404
+
+    borrows = Borrow.query.filter_by(user_id=user_id).all()
+
+    result = []
+    for b in borrows:
+        result.append({
+            "borrow_id": b.id,
+            "borrow_date": b.borrow_date.isoformat() if b.borrow_date else None,
+            "book": book_to_dict(b.book),
+        })
+
+    return jsonify(result), 200
+
+
+@app.route("/books/<int:book_id>/borrowers", methods=["GET"])
+def get_users_who_borrowed_book(book_id):
+    book = Book.query.get(book_id)
+    if not book:
+        return jsonify({"error": "book not found"}), 404
+
+    borrows = Borrow.query.filter_by(book_id=book_id).all()
+
+    result = []
+    for b in borrows:
+        result.append({
+            "borrow_id": b.id,
+            "borrow_date": b.borrow_date.isoformat() if b.borrow_date else None,
+            "user": user_to_dict(b.user),
+        })
+
+    return jsonify(result), 200
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
