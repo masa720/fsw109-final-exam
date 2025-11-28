@@ -89,6 +89,14 @@ def book_to_dict(book: Book):
         "author_id": book.author_id,
     }
 
+def borrow_to_dict(borrow: "Borrow"):
+    return {
+        "id": borrow.id,
+        "user_id": borrow.user_id,
+        "book_id": borrow.book_id,
+        "borrow_date": borrow.borrow_date.isoformat() if borrow.borrow_date else None,
+    }
+
 
 
 @app.route("/")
@@ -335,4 +343,5 @@ def get_users_who_borrowed_book(book_id):
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, port=port)
